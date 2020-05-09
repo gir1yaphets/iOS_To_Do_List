@@ -7,11 +7,16 @@
 //
 
 import UIKit
+import RealmSwift
 
 class EntryViewController: UIViewController, UITextFieldDelegate {
 
     @IBOutlet weak var textField: UITextField!
-    var update: (()->Void)?
+    @IBOutlet weak var datePicker: UIDatePicker!
+    
+    private let realm = try! Realm()
+    
+    var completionHandler: (() -> Void)?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -19,6 +24,8 @@ class EntryViewController: UIViewController, UITextFieldDelegate {
         // Do any additional setup after loading the view.
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Save", style: .done, target: self, action: #selector(saveTask))
         textField.delegate = self
+        
+        datePicker.setDate(Date(), animated: true)
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -28,16 +35,18 @@ class EntryViewController: UIViewController, UITextFieldDelegate {
     }
     
     @objc func saveTask() {
-        guard let text = textField.text else {return}
+        guard let title = textField.text else {return}
         
-        guard let count = UserDefaults().value(forKey: "count") as? Int else {
-            return
-        }
+        realm.beginWrite()
         
-        UserDefaults().set(count + 1, forKey: "count")
-        UserDefaults().set(text, forKey: "task_\(count + 1)")
+        let model = TodoItemModel()
+        model.title = title
+        model.date = datePicker.date
         
-        update?()
+        realm.add(model)
+        try! realm.commitWrite()
+        
+        completionHandler?()
         
         navigationController?.popViewController(animated: true)
     }

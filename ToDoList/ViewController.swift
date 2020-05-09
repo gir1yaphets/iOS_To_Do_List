@@ -7,60 +7,46 @@
 //
 
 import UIKit
+import RealmSwift
 
 class ViewController: UIViewController {
 
     @IBOutlet weak var tableView: UITableView!
+    private let realm = try! Realm()
     
-    var tasks = [String]()
+    private var tasks = [TodoItemModel]()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         initView()
-        loadUserSetting()
-        
+        refreshData()
     }
     
     @available(iOS 13.0, *)
     @IBAction func didTapAdd(_ sender: Any) {
         let vc = storyboard?.instantiateViewController(identifier: "entry") as! EntryViewController
         vc.title = "New Task"
-        vc.update = {
+        vc.completionHandler = {
             DispatchQueue.main.async {
-                self.updateTask()
+                autoreleasepool {
+                    self.refreshData()
+                }
             }
         }
-        navigationController?.pushViewController(vc, animated: false)
+        navigationController?.pushViewController(vc, animated: true)
     }
     
-    func initView() {
-        tableView.dataSource = self
-        tableView.delegate = self
-        
-        updateTask()
-    }
-    
-    func updateTask() {
-        tasks.removeAll()
-        guard let count = UserDefaults().value(forKey: "count") as? Int else {
-            return
-        }
-        
-        for n in 0..<count {
-            if let task = UserDefaults().value(forKey: "task_\(n+1)") as? String {
-                tasks.append(task)
-            }
-        }
-
+    func refreshData() {
+        tasks = realm.objects(TodoItemModel.self).map({ $0 })
         tableView.reloadData()
     }
     
-    func loadUserSetting() {
-        if !UserDefaults().bool(forKey: "setup") {
-            UserDefaults().set(true, forKey: "setup")
-            UserDefaults().set(true, forKey: "count")
-        }
+    func initView() {
+        navigationController?.navigationBar.prefersLargeTitles = true
+        
+        tableView.dataSource = self
+        tableView.delegate = self
     }
 }
 
@@ -71,16 +57,26 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell =  tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
-        cell.textLabel?.text = tasks[indexPath.row]
+        cell.textLabel?.text = tasks[indexPath.row].title
     
         return cell
+    }
+    
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 60
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let vc = storyboard?.instantiateViewController(withIdentifier: "task") as! TaskViewController
         vc.title = "Task"
-        vc.task = tasks[indexPath.row]
-        navigationController?.pushViewController(vc, animated: false)
+        vc.item = tasks[indexPath.row]
+        
+        vc.deletionHandler = {
+            DispatchQueue.main.async{[weak self] in
+                self?.refreshData()
+            }
+        }
+        navigationController?.pushViewController(vc, animated: true)
     }
     
 }
